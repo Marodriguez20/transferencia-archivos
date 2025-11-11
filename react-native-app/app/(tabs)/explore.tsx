@@ -1,112 +1,140 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import React, { useState, useCallback } from 'react';
+import { StyleSheet, FlatList, Alert, Linking, RefreshControl, TouchableOpacity, useColorScheme } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { Colors } from '@/constants/theme'; // Corregido
+import { API_URL } from '@/constants/Api';
 
-export default function TabTwoScreen() {
+export default function FilesScreen() {
+  const [files, setFiles] = useState<string[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const colorScheme = useColorScheme();
+
+  const fetchFiles = async () => {
+    try {
+      const response = await fetch(`${API_URL}/files`);
+      if (!response.ok) throw new Error('Failed to fetch files.');
+      const data = await response.json();
+      setFiles(data);
+    } catch (error) {
+      console.error('Fetch files error:', error);
+      Alert.alert('Error', 'No se pudo cargar la lista de archivos. Revisa la IP y que el servidor esté activo en tu red.');
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchFiles();
+    }, [])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchFiles();
+    setRefreshing(false);
+  }, []);
+
+  const handleDownload = (filename: string) => {
+    const fileUrl = `${API_URL}/uploads/${filename}`;
+    Linking.openURL(fileUrl).catch(err => {
+      console.error("Failed to open URL:", err);
+      Alert.alert("Error", "No se pudo abrir el archivo.");
+    });
+  };
+
+  const handleDelete = (filename: string) => {
+    Alert.alert(
+      'Confirmar eliminación',
+      `¿Estás seguro de que quieres eliminar ${filename}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await fetch(`${API_URL}/files/${filename}`, { method: 'DELETE' });
+              if (!response.ok) throw new Error('Failed to delete file.');
+              Alert.alert('Éxito', 'Archivo eliminado correctamente.');
+              fetchFiles();
+            } catch (error) {
+              console.error('Delete file error:', error);
+              Alert.alert('Error', 'No se pudo eliminar el archivo.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const iconColor = colorScheme === 'dark' ? Colors.dark.icon : Colors.light.icon;
+  const deleteIconColor = '#FF3B30';
+  const borderColor = colorScheme === 'dark' ? '#3a3a3a' : '#ccc';
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <ThemedView style={styles.container}>
+      <FlatList
+        data={files}
+        keyExtractor={(item) => item}
+        renderItem={({ item }) => (
+          <ThemedView style={[styles.fileItem, { borderBottomColor: borderColor }]}>
+            <Feather name="file-text" size={24} color={iconColor} style={styles.fileIcon} />
+            <ThemedText style={styles.fileName}>{item}</ThemedText>
+            <ThemedView style={styles.buttonsContainer}>
+              <TouchableOpacity onPress={() => handleDownload(item)} style={styles.iconButton}>
+                <Feather name="download-cloud" size={24} color={iconColor} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(item)} style={styles.iconButton}>
+                <Feather name="trash-2" size={24} color={deleteIconColor} />
+              </TouchableOpacity>
+            </ThemedView>
+          </ThemedView>
+        )}
+        ListHeaderComponent={() => <ThemedText type="title" style={styles.title}>Archivos en el Servidor</ThemedText>}
+        ListEmptyComponent={() => <ThemedText style={styles.emptyText}>No hay archivos subidos.</ThemedText>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      />
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
   },
-  titleContainer: {
+  title: {
+    marginTop: 20,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  fileItem: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  fileIcon: {
+    marginRight: 15,
+  },
+  fileName: {
+    flex: 1,
+    fontSize: 16,
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  iconButton: {
+    padding: 5,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 50,
+    fontSize: 16,
   },
 });
